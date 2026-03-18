@@ -1,3 +1,7 @@
+<img width="3840" height="2160" alt="image" src="https://github.com/user-attachments/assets/90add065-ffd7-4182-86dc-f6635aebb44f" />
+
+
+
 # GOAINGLYS
 Native Go ML Projects Collection
 
