@@ -1,5 +1,4 @@
-<img width="3840" height="2160" alt="image" src="https://github.com/user-attachments/assets/68f2f7d5-ef22-4e6b-a4cb-a706fbe7ccd4" />
-
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/5ce1d992-426b-4b65-8e84-c09186bdb215" />
 
 Native Go ML Projects Collection
 
