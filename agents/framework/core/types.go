@@ -240,9 +240,9 @@ func RunAgent(agent Agent, input string) (*AgentResult, error) {
 	return agent.Run(ctx, input)
 }
 
-// buildToolsDescription formats tools for inclusion in agent prompts.
+// BuildToolsDescription formats tools for inclusion in agent prompts.
 // Shared by ReAct, PlanExecute, and other agents.
-func buildToolsDescription(tools map[string]core.Tool) string {
+func BuildToolsDescription(tools map[string]Tool) string {
 	if len(tools) == 0 {
 		return "No tools available."
 	}

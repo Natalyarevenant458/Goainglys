@@ -149,7 +149,7 @@ func (a *ReActAgent) buildPrompt() []core.Message {
 		})
 	}
 
-	toolsDescription := buildToolsDescription(a.Ctx.Tools)
+	toolsDescription := core.BuildToolsDescription(a.Ctx.Tools)
 	messages = append(messages, core.Message{
 		ID:        core.GenerateID(),
 		Role:      core.RoleSystem,
@@ -160,29 +160,6 @@ func (a *ReActAgent) buildPrompt() []core.Message {
 	messages = append(messages, a.Ctx.Messages...)
 
 	return messages
-}
-
-func buildToolsDescription(tools map[string]core.Tool) string {
-	if len(tools) == 0 {
-		return "No tools available."
-	}
-
-	var desc strings.Builder
-	for _, tool := range tools {
-		desc.WriteString(fmt.Sprintf("## %s\n", tool.Name()))
-		desc.WriteString(fmt.Sprintf("%s\n", tool.Description()))
-		desc.WriteString("Parameters:\n")
-		for paramName, param := range tool.Parameters() {
-			required := ""
-			if param.Required {
-				required = " (required)"
-			}
-			desc.WriteString(fmt.Sprintf("  - %s: %s%s\n", paramName, param.Description, required))
-		}
-		desc.WriteString("\n")
-	}
-
-	return desc.String()
 }
 
 func parseToolCalls(content string) ([]core.ToolCall, bool) {

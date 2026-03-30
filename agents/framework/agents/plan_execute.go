@@ -227,7 +227,7 @@ func (a *PlanExecuteAgent) buildMessages(userPrompt string) []core.Message {
 		})
 	}
 
-	toolsDescription := buildToolsDescription(a.Ctx.Tools)
+	toolsDescription := core.BuildToolsDescription(a.Ctx.Tools)
 	if toolsDescription != "" && toolsDescription != "No tools available." {
 		messages = append(messages, core.Message{
 			ID:        core.GenerateID(),
