@@ -25,7 +25,6 @@ type ErrorRecord struct {
 func NewDetector() *Detector {
 	return &Detector{
 		errorLog:     make([]ErrorRecord, 0),
-		errors:       make(map[string]int),
 		taskPatterns: make(map[string]int),
 	}
 }
@@ -40,15 +39,11 @@ func (d *Detector) RecordResult(task, taskType string, correct bool, attempts in
 		Difficulty: difficulty,
 	})
 	d.taskPatterns[taskType]++
-	if !correct {
-		d.errors[taskType]++
-	}
 }
 
 func (d *Detector) Detect(agent core.AgentInterface, task string, validationSetSize int) ([]core.Weakness, error) {
 	var weaknesses []core.Weakness
 
-	// Analyze error patterns by task type
 	typeStats := make(map[string]*taskStats)
 	for _, rec := range d.errorLog {
 		if _, ok := typeStats[rec.TaskType]; !ok {
@@ -62,34 +57,17 @@ func (d *Detector) Detect(agent core.AgentInterface, task string, validationSetS
 		ts.totalDifficulty += rec.Difficulty
 	}
 
-	// Identify weaknesses from error patterns
 	for taskType, stats := range typeStats {
 		if stats.total < 3 {
-			continue // Need minimum samples
+			continue
 		}
-
 		errorRate := float64(stats.errors) / float64(stats.total)
 		avgDifficulty := stats.totalDifficulty / float64(stats.total)
-
-		if errorRate > 0.2 { // More than 20% error rate
-			weakness := d.analyzeWeakness(taskType, errorRate, avgDifficulty, stats)
-			weaknesses = append(weaknesses, weakness)
+		if errorRate > 0.2 {
+			weaknesses = append(weaknesses, d.analyzeWeakness(taskType, errorRate, avgDifficulty, stats))
 		}
 	}
 
-	// Analyze confusion patterns (tasks where agent spent too long or needed many attempts)
-	confusion := d.detectConfusion()
-	for _, c := range confusion {
-		weaknesses = append(weaknesses, c)
-	}
-
-	// Analyze difficulty thresholds
-	difficultyGaps := d.detectDifficultyGaps()
-	for _, g := range difficultyGaps {
-		weaknesses = append(weaknesses, g)
-	}
-
-	// If no specific weaknesses found, return general ones
 	if len(weaknesses) == 0 {
 		weaknesses = append(weaknesses, core.Weakness{
 			ID:             "general",
@@ -112,8 +90,6 @@ type taskStats struct {
 
 func (d *Detector) analyzeWeakness(taskType string, errorRate, avgDifficulty float64, stats *taskStats) core.Weakness {
 	description := d.getWeaknessDescription(taskType, errorRate)
-	suggestedFocus := d.getSuggestedFocus(taskType)
-
 	return core.Weakness{
 		ID:             fmt.Sprintf("weakness_%s_%d", taskType, int(errorRate*100)),
 		Description:    description,
@@ -121,7 +97,7 @@ func (d *Detector) analyzeWeakness(taskType string, errorRate, avgDifficulty flo
 		Difficulty:     math.Min(1.0, avgDifficulty+0.1),
 		Frequency:      stats.errors,
 		Examples:       d.getExamples(taskType, 3),
-		SuggestedFocus: suggestedFocus,
+		SuggestedFocus: d.getSuggestedFocus(taskType),
 	}
 }
 
@@ -187,111 +163,26 @@ func (d *Detector) getExamples(taskType string, n int) []string {
 	return []string{"Practice " + taskType + " problems"}
 }
 
-func (d *Detector) detectConfusion() []core.Weakness {
-	var weaknesses []core.Weakness
-	confusedTasks := make(map[string]int)
-
-	for _, rec := range d.errorLog {
-		if !rec.Correct && rec.Attempts > 1 {
-			confusedTasks[rec.TaskType]++
-		}
-	}
-
-	for taskType, count := range confusedTasks {
-		if count >= 2 {
-			weaknesses = append(weaknesses, core.Weakness{
-				ID:             fmt.Sprintf("confusion_%s", taskType),
-				Description:    fmt.Sprintf("Repeated failures in %s - agent struggles to self-correct", taskType),
-				TaskType:       taskType,
-				Difficulty:     0.6,
-				Frequency:      count,
-				SuggestedFocus: "Practice with hints or step-by-step decomposition",
-			})
-		}
-	}
-
-	return weaknesses
-}
-
-func (d *Detector) detectDifficultyGaps() []core.Weakness {
-	var weaknesses []core.Weakness
-	byDifficulty := make(map[int][]ErrorRecord)
-
-	for _, rec := range d.errorLog {
-		level := int(rec.Difficulty * 3) // 0=Easy, 1=Medium, 2=Hard
-		byDifficulty[level] = append(byDifficulty[level], rec)
-	}
-
-	// Detect sudden jumps in error rate
-	for level := 1; level < 3; level++ {
-		lower := byDifficulty[level-1]
-		upper := byDifficulty[level]
-		if len(lower) < 3 || len(upper) < 3 {
-			continue
-		}
-
-		lowerErrors := 0
-		for _, r := range lower {
-			if !r.Correct {
-				lowerErrors++
-			}
-		}
-		upperErrors := 0
-		for _, r := range upper {
-			if !r.Correct {
-				upperErrors++
-			}
-		}
-
-		lowerRate := float64(lowerErrors) / float64(len(lower))
-		upperRate := float64(upperErrors) / float64(len(upper))
-
-		if upperRate-lowerRate > 0.3 { // Sudden 30% jump in error rate
-			diffName := "easy"
-			if level == 1 {
-				diffName = "easy-to-medium"
-			} else {
-				diffName = "medium-to-hard"
-			}
-			weaknesses = append(weaknesses, core.Weakness{
-				ID:             fmt.Sprintf("gap_%s", diffName),
-				Description:    fmt.Sprintf("Performance gap at %s transition", diffName),
-				TaskType:       "difficulty_gap",
-				Difficulty:     float64(level) / 2.0,
-				Frequency:      len(upper),
-				SuggestedFocus: "Bridge the difficulty gap with intermediate problems",
-			})
-		}
-	}
-
-	return weaknesses
-}
-
-// AnalyzePerformanceTrend computes whether performance is improving or degrading
 func (d *Detector) AnalyzePerformanceTrend(windowSize int) (improving bool, trend float64) {
-	if len(d.errorLog) < windowSize {
+	if len(d.errorLog) < windowSize*2 {
 		return true, 0.0
 	}
-
 	recent := d.errorLog[len(d.errorLog)-windowSize:]
 	older := d.errorLog[len(d.errorLog)-2*windowSize : len(d.errorLog)-windowSize]
-
-	olderErrors := 0
+	olderErrs := 0
 	for _, r := range older {
 		if !r.Correct {
-			olderErrors++
+			olderErrs++
 		}
 	}
-	recentErrors := 0
+	recentErrs := 0
 	for _, r := range recent {
 		if !r.Correct {
-			recentErrors++
+			recentErrs++
 		}
 	}
-
-	olderRate := float64(olderErrors) / float64(len(older))
-	recentRate := float64(recentErrors) / float64(len(recent))
-
+	olderRate := float64(olderErrs) / float64(len(older))
+	recentRate := float64(recentErrs) / float64(len(recent))
 	trend = recentRate - olderRate
 	improving = recentRate < olderRate
 	return

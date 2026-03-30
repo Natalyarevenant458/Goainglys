@@ -485,3 +485,48 @@ func intToFloat32(ints []int) []float32 {
 	}
 	return floats
 }
+
+// ============================================================
+// NN Optimizer Adapter (wires unified nn package into transformers)
+// ============================================================
+
+// NNOptimizer wraps nn.Optimizer for use in transformers
+type NNOptimizer struct {
+	Optimizer interface {
+		Step()
+		ZeroGrad()
+		SetLearningRate(lr float64)
+	}
+	paramSlots [][]float64
+}
+
+// NewNNOptimizer creates an adapter for nn.Optimizer
+func NewNNOptimizer(opt interface {
+	Step()
+	ZeroGrad()
+	SetLearningRate(lr float64)
+}, params [][]float32) *NNOptimizer {
+	slots := make([][]float64, len(params))
+	for i, p := range params {
+		slots[i] = make([]float64, len(p))
+		for j, v := range p {
+			slots[i][j] = float64(v)
+		}
+	}
+	return &NNOptimizer{
+		Optimizer:  opt,
+		paramSlots: slots,
+	}
+}
+
+func (n *NNOptimizer) Step() {
+	n.Optimizer.Step()
+}
+
+func (n *NNOptimizer) ZeroGrad() {
+	n.Optimizer.ZeroGrad()
+}
+
+func (n *NNOptimizer) SetLearningRate(lr float32) {
+	n.Optimizer.SetLearningRate(float64(lr))
+}

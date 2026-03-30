@@ -12,7 +12,7 @@ func main() {
 	fmt.Println()
 
 	// Seed random
-	rand.Seed(42)
+	rand.Seed(42) //nolint:staticcheck // for reproducible demo
 
 	// ============================================================
 	// Demo 1: Basic Scheduler Usage

@@ -18,6 +18,33 @@ func (t *Tensor) Numel() int {
 	return n
 }
 
+// Data2D returns a 2D float64 slice representation of the tensor data
+func (t *Tensor) Data2D() [][]float64 {
+	if len(t.Shape) == 1 {
+		result := make([][]float64, 1)
+		result[0] = make([]float64, len(t.Data))
+		for i, v := range t.Data {
+			result[0][i] = float64(v)
+		}
+		return result
+	}
+	// For 2D, reshape to [][]float64
+	rows := 1
+	cols := len(t.Data)
+	if len(t.Shape) >= 2 {
+		rows = t.Shape[0]
+		cols = t.Shape[1]
+	}
+	result := make([][]float64, rows)
+	for i := 0; i < rows; i++ {
+		result[i] = make([]float64, cols)
+		for j := 0; j < cols; j++ {
+			result[i][j] = float64(t.Data[i*cols+j])
+		}
+	}
+	return result
+}
+
 type Optimizer interface {
 	Step()
 	ZeroGrad()
@@ -375,4 +402,48 @@ func (m *OptimizerManager) SetLearningRate(lr float64) {
 	for _, opt := range m.optimizers {
 		opt.SetLearningRate(lr)
 	}
+}
+
+// ============================================================
+// NN Optimizer Adapter (wires unified nn package into finetune)
+// ============================================================
+
+// NNOptimizer wraps nn.Optimizer for use in finetune
+// This allows finetune to use the unified optimizer implementations
+type NNOptimizer struct {
+	Optimizer interface {
+		Step()
+		ZeroGrad()
+		SetLearningRate(lr float64)
+	}
+	ParamSlots [][][]float64 // stored parameter references
+}
+
+// NewNNOptimizer creates an adapter for nn.Optimizer
+// Parameters are converted to float64 for nn, changes reflect back
+func NewNNOptimizer(opt interface {
+	Step()
+	ZeroGrad()
+	SetLearningRate(lr float64)
+}, params []*Tensor) *NNOptimizer {
+	slots := make([][][]float64, len(params))
+	for i, p := range params {
+		slots[i] = p.Data2D()
+	}
+	return &NNOptimizer{
+		Optimizer:  opt,
+		ParamSlots: slots,
+	}
+}
+
+func (n *NNOptimizer) Step() {
+	n.Optimizer.Step()
+}
+
+func (n *NNOptimizer) ZeroGrad() {
+	n.Optimizer.ZeroGrad()
+}
+
+func (n *NNOptimizer) SetLearningRate(lr float64) {
+	n.Optimizer.SetLearningRate(lr)
 }

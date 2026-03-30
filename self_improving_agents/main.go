@@ -133,7 +133,7 @@ func NewSelfImprovingMathAgent(
 	mathAgent := NewMathAgentAdapter(baseAgent)
 
 	// Initialize components
-	wd := weakness_detector.NewDetector(ragEvalAdapter)
+	wd := weakness_detector.NewDetector()
 	dg := data_generator.NewGenerator(modelAdapter)
 	il := improvement_loop.NewLoop(fineTuneAdapter, ragEvalAdapter)
 	ml := meta_learner.NewLearner()
@@ -442,7 +442,7 @@ func main() {
 		modelRegistryAdapter: *modelRegistryAdapter,
 		dashboardAdapter:     *dashboardAdapter,
 
-		weaknessDetector: weakness_detector.NewDetector(*ragEvalAdapter),
+		weaknessDetector: weakness_detector.NewDetector(),
 		dataGenerator:    data_generator.NewGenerator(*modelAdapter),
 		improvementLoop:  improvement_loop.NewLoop(*fineTuneAdapter, *ragEvalAdapter),
 		metaLearner:      meta_learner.NewLearner(),
