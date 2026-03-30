@@ -1,4 +1,4 @@
-package advanced_research
+package main
 
 import (
 	"math"
@@ -15,10 +15,10 @@ type DDPMConfig struct {
 
 // Diffusion holds the diffusion model state
 type Diffusion struct {
-	config      DDPMConfig
-	Beta        []float64 // Beta schedule
-	AlphaBar    []float64 // Cumulative alpha
-	AlphaBarT   []float64 // 1 - cumulative alpha (for variance)
+	config         DDPMConfig
+	Beta           []float64   // Beta schedule
+	AlphaBar       []float64   // Cumulative alpha
+	AlphaBarT      []float64   // 1 - cumulative alpha (for variance)
 	DenoisingModel *DenoisingModel
 }
 
@@ -27,7 +27,6 @@ func NewDDPM(config DDPMConfig) *Diffusion {
 	// Linear beta schedule
 	beta := make([]float64, config.Timesteps)
 	alphaBar := make([]float64, config.Timesteps)
-	alphaBarT := make([]float64, config.Timesteps)
 
 	betaStep := (config.BetaEnd - config.BetaStart) / float64(config.Timesteps-1)
 	for t := 0; t < config.Timesteps; t++ {
@@ -47,6 +46,7 @@ func NewDDPM(config DDPMConfig) *Diffusion {
 	}
 
 	// Compute 1 - cumulative alpha (for variance in reverse process)
+	alphaBarT := make([]float64, config.Timesteps)
 	for t := 0; t < config.Timesteps; t++ {
 		alphaBarT[t] = 1.0 - alphaBar[t]
 	}
@@ -54,10 +54,10 @@ func NewDDPM(config DDPMConfig) *Diffusion {
 	denoisingModel := NewDenoisingModel(config.ModelDim)
 
 	return &Diffusion{
-		config:        config,
-		Beta:          beta,
-		AlphaBar:      alphaBar,
-		AlphaBarT:     alphaBarT,
+		config:         config,
+		Beta:           beta,
+		AlphaBar:       alphaBar,
+		AlphaBarT:      alphaBarT,
 		DenoisingModel: denoisingModel,
 	}
 }
@@ -100,16 +100,16 @@ func (te *TimeEmbedding) Forward(timesteps []int) [][]float64 {
 
 // DenoisingModel is a simple UNet-style denoising model
 type DenoisingModel struct {
-	modelDim    int
-	timeEmbed   *TimeEmbedding
-	
+	modelDim  int
+	timeEmbed *TimeEmbedding
+
 	// Input projection
 	inputProj [][]float64
 	inputBias []float64
-	
+
 	// Residual blocks
 	resBlocks []ResidualBlock
-	
+
 	// Output projection
 	outputProj [][]float64
 	outputBias []float64
@@ -117,13 +117,13 @@ type DenoisingModel struct {
 
 // ResidualBlock is a residual block with time embedding
 type ResidualBlock struct {
-	norm1     [][]float64
-	norm1Bias []float64
-	linear1   [][]float64
+	norm1       [][]float64
+	norm1Bias   []float64
+	linear1     [][]float64
 	linear1Bias []float64
-	linear2   [][]float64
+	linear2     [][]float64
 	linear2Bias []float64
-	timeMlp   [][]float64
+	timeMlp     [][]float64
 	timeMlpBias []float64
 }
 
@@ -390,7 +390,7 @@ func (d *Diffusion) ForwardDiffusion(x0 [][]float64, t int) ([][]float64, [][]fl
 // Returns: generated samples (numSamples x dim)
 func (d *Diffusion) Sample(numSamples int) [][]float64 {
 	dim := d.config.ModelDim
-	
+
 	// Start from random noise
 	xT := make([][]float64, numSamples)
 	for i := 0; i < numSamples; i++ {
@@ -413,7 +413,7 @@ func (d *Diffusion) Sample(numSamples int) [][]float64 {
 		// Compute parameters for this timestep
 		alphaT := 1.0 - d.Beta[t]
 		alphaBarT := d.AlphaBar[t]
-		
+
 		var alphaBarTMinus1 float64
 		if t > 0 {
 			alphaBarTMinus1 = d.AlphaBar[t-1]
@@ -429,18 +429,19 @@ func (d *Diffusion) Sample(numSamples int) [][]float64 {
 		for i := 0; i < numSamples; i++ {
 			// x_{t-1} = (x_t - sqrt(1-alpha_bar_t) * pred_noise) / sqrt(alpha_t) + z * sigma_t
 			sigmaT := math.Sqrt((1 - alphaBarTMinus1) / (1 - alphaBarT) * betaT)
-			
+
 			for j := 0; j < dim; j++ {
 				mean := (xT[i][j] - sqrtOneMinusAlphaBarT*predNoise[i][j]) / sqrtAlphaT
-				
+
 				var z float64
 				if t > 0 {
 					z = rand.NormFloat64()
 				}
-				
+
 				xT[i][j] = mean + sigmaT*z
 			}
 		}
+		_ = alphaT // Used in calculation
 	}
 
 	return xT
@@ -450,10 +451,10 @@ func (d *Diffusion) Sample(numSamples int) [][]float64 {
 // numSteps: number of denoising steps (typically less than full timesteps)
 func (d *Diffusion) DDIMSampler(numSamples, numSteps int) [][]float64 {
 	dim := d.config.ModelDim
-	
+
 	// Select step size
 	stepSize := d.config.Timesteps / numSteps
-	
+
 	// Start from random noise
 	xT := make([][]float64, numSamples)
 	for i := 0; i < numSamples; i++ {
@@ -475,9 +476,8 @@ func (d *Diffusion) DDIMSampler(numSamples, numSteps int) [][]float64 {
 		predNoise := d.DenoisingModel.Forward(xT, timesteps)
 
 		// Compute parameters
-		alphaT := 1.0 - d.Beta[t]
-		alphaBarT := d.AlphaBar[t]
-		
+		_ = d.AlphaBar[t] // alpha at current step
+
 		var alphaBarTMinusStep float64
 		if step > 0 {
 			alphaBarTMinusStep = d.AlphaBar[t-stepSize]
@@ -486,15 +486,14 @@ func (d *Diffusion) DDIMSampler(numSamples, numSteps int) [][]float64 {
 		}
 
 		// DDIM update
+		sqrtAlphaBarTMinusStep := math.Sqrt(alphaBarTMinusStep)
+
 		for i := 0; i < numSamples; i++ {
-			sqrtAlphaBarTMinusStep := math.Sqrt(alphaBarTMinusStep)
-			sqrtOneMinusAlphaBarT := math.Sqrt(1.0 - alphaBarT)
-			
 			// x_{t-1} = sqrt(alpha_bar_{t-step}) * pred + sqrt(1 - alpha_bar_t) * noise
 			for j := 0; j < dim; j++ {
-				dir := predNoise[i][j] * math.Sqrt(1 - alphaBarTMinusStep)
-				xT[i][j] = sqrtAlphaBarTMinusStep*xT[i][j] - dir
-				
+				dirTerm := predNoise[i][j] * math.Sqrt(1-alphaBarTMinusStep)
+				xT[i][j] = sqrtAlphaBarTMinusStep*xT[i][j] - dirTerm
+
 				if step > 0 {
 					xT[i][j] += math.Sqrt(1-alphaBarTMinusStep) * rand.NormFloat64() * 0.001
 				}
@@ -549,27 +548,28 @@ func (d *Diffusion) TrainStep(x0 [][]float64, t int, lr float64) float64 {
 // denoisingModelUpdate performs a simple gradient update on the denoising model
 func (d *Diffusion) denoisingModelUpdate(x0 [][]float64, t int, lr, epsilon float64) {
 	// Get current prediction
-	xt, _ := d.ForwardDiffusion(x0, t)
+	_, _ = d.ForwardDiffusion(x0, t)
 	timesteps := make([]int, len(x0))
 	for i := range timesteps {
 		timesteps[i] = t
 	}
+	_ = timesteps
 
 	// Numerical gradient for input projection weights
 	for i := 0; i < d.DenoisingModel.modelDim; i++ {
 		for j := 0; j < len(d.DenoisingModel.inputBias); j++ {
 			// Simple update: nudge weight in direction that reduces loss
 			orig := d.DenoisingModel.inputProj[i][j]
-			
+
 			d.DenoisingModel.inputProj[i][j] = orig + epsilon
 			lossPlus := d.ComputeLoss(x0, t)
-			
+
 			d.DenoisingModel.inputProj[i][j] = orig - epsilon
 			lossMinus := d.ComputeLoss(x0, t)
-			
+
 			d.DenoisingModel.inputProj[i][j] = orig
 			grad := (lossPlus - lossMinus) / (2 * epsilon)
-			
+
 			d.DenoisingModel.inputProj[i][j] -= lr * grad
 		}
 	}
@@ -577,16 +577,16 @@ func (d *Diffusion) denoisingModelUpdate(x0 [][]float64, t int, lr, epsilon floa
 	// Update biases
 	for j := 0; j < len(d.DenoisingModel.inputBias); j++ {
 		orig := d.DenoisingModel.inputBias[j]
-		
+
 		d.DenoisingModel.inputBias[j] = orig + epsilon
 		lossPlus := d.ComputeLoss(x0, t)
-		
+
 		d.DenoisingModel.inputBias[j] = orig - epsilon
 		lossMinus := d.ComputeLoss(x0, t)
-		
+
 		d.DenoisingModel.inputBias[j] = orig
 		grad := (lossPlus - lossMinus) / (2 * epsilon)
-		
+
 		d.DenoisingModel.inputBias[j] -= lr * grad
 	}
 
@@ -594,16 +594,16 @@ func (d *Diffusion) denoisingModelUpdate(x0 [][]float64, t int, lr, epsilon floa
 	for i := 0; i < len(d.DenoisingModel.outputProj); i++ {
 		for j := 0; j < len(d.DenoisingModel.outputBias); j++ {
 			orig := d.DenoisingModel.outputProj[i][j]
-			
+
 			d.DenoisingModel.outputProj[i][j] = orig + epsilon
 			lossPlus := d.ComputeLoss(x0, t)
-			
+
 			d.DenoisingModel.outputProj[i][j] = orig - epsilon
 			lossMinus := d.ComputeLoss(x0, t)
-			
+
 			d.DenoisingModel.outputProj[i][j] = orig
 			grad := (lossPlus - lossMinus) / (2 * epsilon)
-			
+
 			d.DenoisingModel.outputProj[i][j] -= lr * grad
 		}
 	}
@@ -611,16 +611,16 @@ func (d *Diffusion) denoisingModelUpdate(x0 [][]float64, t int, lr, epsilon floa
 	// Update output bias
 	for j := 0; j < len(d.DenoisingModel.outputBias); j++ {
 		orig := d.DenoisingModel.outputBias[j]
-		
+
 		d.DenoisingModel.outputBias[j] = orig + epsilon
 		lossPlus := d.ComputeLoss(x0, t)
-		
+
 		d.DenoisingModel.outputBias[j] = orig - epsilon
 		lossMinus := d.ComputeLoss(x0, t)
-		
+
 		d.DenoisingModel.outputBias[j] = orig
 		grad := (lossPlus - lossMinus) / (2 * epsilon)
-		
+
 		d.DenoisingModel.outputBias[j] -= lr * grad
 	}
 }

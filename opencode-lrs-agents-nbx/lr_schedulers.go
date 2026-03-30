@@ -31,22 +31,24 @@ func RegisterScheduler(name string, factory func(baseLR float64, opts ...Option)
 type Option func(*schedulerConfig)
 
 type schedulerConfig struct {
-	maxLR       float64
-	minLR       float64
-	warmupSteps int
-	totalSteps  int
-	divFactor   float64
+	maxLR          float64
+	minLR          float64
+	warmupSteps    int
+	totalSteps     int
+	divFactor      float64
 	finalDivFactor float64
-	stepSize    int
-	cycleSize   int
-	gamma       float64
-	T0          int
-	TMult       float64
-	power       float64
-	maxEval     float64
-	patience    int
-	factor      float64
-	cooldown    int
+	stepSize       int
+	cycleSize      int
+	gamma          float64
+	T0             int
+	TMult          float64
+	power          float64
+	maxEval        float64
+	patience       int
+	factor         float64
+	cooldown       int
+	pctStart       float64
+	threePhase     bool
 }
 
 // WithMaxLR sets the maximum learning rate
@@ -136,23 +138,23 @@ func WithMaxEval(v float64) Option {
 
 // OneCycleLR implements the OneCycle learning rate schedule
 type OneCycleLR struct {
-	maxLR           float64
-	minLR           float64
-	divFactor       float64
-	finalDivFactor  float64
-	totalSteps      int
-	currentStep     int
-	warmupSteps     int
-	decaySteps      int
-	pctStart        float64
-	threePhase      bool
+	maxLR          float64
+	minLR          float64
+	divFactor      float64
+	finalDivFactor float64
+	totalSteps     int
+	currentStep    int
+	warmupSteps    int
+	decaySteps     int
+	pctStart       float64
+	threePhase     bool
 }
 
 func NewOneCycleLR(baseLR float64, opts ...Option) LRScheduler {
 	cfg := &schedulerConfig{
 		maxLR:          baseLR,
 		minLR:          baseLR,
-		divFactor:      25.0,
+		divFactor:     25.0,
 		finalDivFactor: 1e4,
 		totalSteps:     100000,
 		warmupSteps:    0,
@@ -196,7 +198,7 @@ func (o *OneCycleLR) GetLR() float64 {
 	if o.threePhase {
 		// Three phase: warmup -> annealing -> fine-tuning
 		phase1End := float64(o.warmupSteps)
-		phase2End := phase1End + (total - phase1End)*0.9
+		phase2End := phase1End + (total-phase1End)*0.9
 
 		if step <= phase1End {
 			// Phase 1: Linear warmup
@@ -343,13 +345,13 @@ func (c *CyclicLR) SetMode(mode CycleMode) {
 
 // CosineAnnealingWarmRestarts implements SGDR
 type CosineAnnealingWarmRestarts struct {
-	baseLR  float64
-	minLR   float64
-	T0      int
-	TMult   float64
+	baseLR      float64
+	minLR       float64
+	T0          int
+	TMult       float64
 	currentStep int
-	T_i    float64
-	T_cur  float64
+	T_i         float64
+	T_cur       float64
 }
 
 func NewCosineAnnealingWarmRestarts(baseLR float64, opts ...Option) LRScheduler {
@@ -549,18 +551,18 @@ func (e *ExponentialWarmup) Reset() {
 
 // ReduceLROnPlateau reduces LR when metric plateaus
 type ReduceLROnPlateau struct {
-	optimizer    interface{ SetLearningRate(lr float64) }
-	baseLR       float64
-	minLR        float64
-	factor       float64
-	patience     int
-	cooldown     int
-	mode         string // "min" or "max"
-	currentStep  int
-	bestMetric   float64
-	badEpochs    int
-	inCooldown   int
-	lastLR       float64
+	optimizer   interface{ SetLearningRate(lr float64) }
+	baseLR      float64
+	minLR       float64
+	factor      float64
+	patience    int
+	cooldown    int
+	mode        string // "min" or "max"
+	currentStep int
+	bestMetric  float64
+	badEpochs   int
+	inCooldown  int
+	lastLR      float64
 	metricHistory []float64
 }
 
@@ -576,18 +578,18 @@ func NewReduceLROnPlateau(optimizer interface{ SetLearningRate(lr float64) }, ba
 	}
 
 	r := &ReduceLROnPlateau{
-		optimizer:   optimizer,
-		baseLR:      baseLR,
-		minLR:       cfg.minLR,
-		factor:      cfg.factor,
-		patience:    cfg.patience,
-		cooldown:    cfg.cooldown,
-		mode:        "min",
-		currentStep: 0,
-		bestMetric:  math.Inf(1), // For min mode
-		badEpochs:   0,
-		inCooldown:  0,
-		lastLR:      baseLR,
+		optimizer:    optimizer,
+		baseLR:       baseLR,
+		minLR:        cfg.minLR,
+		factor:       cfg.factor,
+		patience:     cfg.patience,
+		cooldown:     cfg.cooldown,
+		mode:         "min",
+		currentStep:  0,
+		bestMetric:   math.Inf(1), // For min mode
+		badEpochs:    0,
+		inCooldown:   0,
+		lastLR:       baseLR,
 		metricHistory: make([]float64, 0),
 	}
 	return r

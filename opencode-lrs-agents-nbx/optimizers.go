@@ -2,29 +2,28 @@ package lrs
 
 import (
 	"math"
-	"math/rand"
 )
+
+// OptimizerWithLR is an optimizer that has GetLR method
+type OptimizerWithLR interface {
+	Step()
+	ZeroGrad()
+	SetLearningRate(lr float64)
+	GetLR() float64
+}
 
 // LRSOptimizer wraps an optimizer with per-step LR scheduling
 // This wrapper applies LR from any scheduler on each step
 type LRSOptimizer struct {
-	optimizer     interface {
-		Step()
-		ZeroGrad()
-		SetLearningRate(lr float64)
-	}
-	scheduler     LRScheduler
-	gradScale     float64
-	clipGradNorm  float64
+	optimizer    OptimizerWithLR
+	scheduler    LRScheduler
+	gradScale    float64
+	clipGradNorm float64
 	historyLR    []float64
 	historyLoss  []float64
 }
 
-func NewLRSOptimizer(optimizer interface {
-	Step()
-	ZeroGrad()
-	SetLearningRate(lr float64)
-}, scheduler LRScheduler) *LRSOptimizer {
+func NewLRSOptimizer(optimizer OptimizerWithLR, scheduler LRScheduler) *LRSOptimizer {
 	return &LRSOptimizer{
 		optimizer:    optimizer,
 		scheduler:    scheduler,
@@ -38,21 +37,21 @@ func NewLRSOptimizer(optimizer interface {
 func (l *LRSOptimizer) Step() float64 {
 	// Get current LR from scheduler
 	lr := l.scheduler.Step()
-	
+
 	// Apply gradient clipping if enabled
 	if l.clipGradNorm > 0 {
 		l.applyGradientClipping()
 	}
-	
+
 	// Set the learning rate on the optimizer
 	l.optimizer.SetLearningRate(lr * l.gradScale)
-	
+
 	// Perform the optimization step
 	l.optimizer.Step()
-	
+
 	// Record history
 	l.historyLR = append(l.historyLR, l.optimizer.GetLR())
-	
+
 	return lr
 }
 
@@ -102,25 +101,27 @@ func (l *LRSOptimizer) applyGradientClipping() {
 // A deterministic gradient scaling method with LR awareness
 // ============================================================
 
-// Prodigy implements the Prodigy optimizer
-type Prodigy struct {
-	Slots       []*ParamSlot
-	lr          float64
-	beta1       float64
-	beta2       float64
-	eps         float64
-	weightDecay float64
-	d           float64 // Damping factor
-	step        int
-	gradAnisotropy float64
+// ParamSlot contains optimizer state for a parameter group
+type ParamSlot struct {
+	Data    []float64
+	Grad    []float64
+	M1      []float64 // First moment (for bias-corrected update)
+	M2      []float64 // Second moment
+	Precond []float64 // Preconditioner (adaptive per-param LR)
 }
 
-type ParamSlot struct {
-	Data     []float64
-	Grad     []float64
-	M1       []float64 // First moment (for bias-corrected update)
-	M2       []float64 // Second moment
-	Precond  []float64 // Preconditioner (adaptive per-param LR)
+// Prodigy implements the Prodigy optimizer
+type Prodigy struct {
+	Slots           []*ParamSlot
+	lr              float64
+	beta1           float64
+	beta2           float64
+	eps             float64
+	weightDecay     float64
+	d               float64 // Damping factor
+	step            int
+	gradAnisotropy  float64
+	currentLR       float64
 }
 
 func NewProdigy(lr, beta1, beta2, eps, weightDecay, d, gradAnisotropy float64) *Prodigy {
@@ -133,6 +134,7 @@ func NewProdigy(lr, beta1, beta2, eps, weightDecay, d, gradAnisotropy float64) *
 		weightDecay:    weightDecay,
 		d:              d,
 		gradAnisotropy: gradAnisotropy,
+		currentLR:      lr,
 	}
 }
 
@@ -214,10 +216,11 @@ func (p *Prodigy) ZeroGrad() {
 
 func (p *Prodigy) SetLearningRate(lr float64) {
 	p.lr = lr
+	p.currentLR = lr
 }
 
-func (p *Prodigy) GetLearningRate() float64 {
-	return p.lr
+func (p *Prodigy) GetLR() float64 {
+	return p.currentLR
 }
 
 // ============================================================
@@ -226,27 +229,29 @@ func (p *Prodigy) GetLearningRate() float64 {
 
 // AdamScale implements Adam with gradient norm-based scaling
 type AdamScale struct {
-	Slots       []*ParamSlot
-	lr          float64
-	beta1       float64
-	beta2       float64
-	eps         float64
-	weightDecay float64
-	step        int
-	scaleFactor float64
-	prevGradNorm float64
+	Slots         []*ParamSlot
+	lr            float64
+	beta1         float64
+	beta2         float64
+	eps           float64
+	weightDecay   float64
+	step          int
+	scaleFactor   float64
+	prevGradNorm  float64
+	currentLR     float64
 }
 
 func NewAdamScale(lr, beta1, beta2, eps, weightDecay float64) *AdamScale {
 	return &AdamScale{
-		Slots:         make([]*ParamSlot, 0),
-		lr:            lr,
-		beta1:         beta1,
-		beta2:         beta2,
-		eps:           eps,
-		weightDecay:   weightDecay,
-		scaleFactor:   1.0,
-		prevGradNorm:  0.0,
+		Slots:        make([]*ParamSlot, 0),
+		lr:           lr,
+		beta1:        beta1,
+		beta2:        beta2,
+		eps:          eps,
+		weightDecay:  weightDecay,
+		scaleFactor:  1.0,
+		prevGradNorm: 0.0,
+		currentLR:    lr,
 	}
 }
 
@@ -323,10 +328,15 @@ func (a *AdamScale) ZeroGrad() {
 
 func (a *AdamScale) SetLearningRate(lr float64) {
 	a.lr = lr
+	a.currentLR = lr
 }
 
 func (a *AdamScale) GetLearningRate() float64 {
-	return a.lr
+	return a.currentLR
+}
+
+func (a *AdamScale) GetLR() float64 {
+	return a.currentLR
 }
 
 // GetScaleFactor returns the current gradient scale factor
@@ -341,26 +351,28 @@ func (a *AdamScale) GetScaleFactor() float64 {
 
 // LARS implements Layer-wise Adaptive Rate Scaling
 type LARS struct {
-	Slots       []*ParamSlot
-	lr          float64
-	momentum    float64
-	weightDecay float64
-	eps         float64
-	trustCoeff  float64 // Trust coefficient (typically 0.001-0.01)
-	maxScale    float64 // Maximum local LR multiplier
-	minScale    float64 // Minimum local LR multiplier
+	Slots        []*ParamSlot
+	lr           float64
+	momentum     float64
+	weightDecay  float64
+	eps          float64
+	trustCoeff   float64 // Trust coefficient (typically 0.001-0.01)
+	maxScale     float64 // Maximum local LR multiplier
+	minScale     float64 // Minimum local LR multiplier
+	currentLR    float64
 }
 
 func NewLARS(lr, momentum, weightDecay, trustCoeff, maxScale, minScale float64) *LARS {
 	return &LARS{
-		Slots:        make([]*ParamSlot, 0),
-		lr:           lr,
-		momentum:     momentum,
-		weightDecay:  weightDecay,
-		eps:          1e-9,
-		trustCoeff:   trustCoeff,
-		maxScale:     maxScale,
-		minScale:     minScale,
+		Slots:       make([]*ParamSlot, 0),
+		lr:          lr,
+		momentum:    momentum,
+		weightDecay: weightDecay,
+		eps:         1e-9,
+		trustCoeff:  trustCoeff,
+		maxScale:    maxScale,
+		minScale:    minScale,
+		currentLR:   lr,
 	}
 }
 
@@ -437,10 +449,15 @@ func (l *LARS) ZeroGrad() {
 
 func (l *LARS) SetLearningRate(lr float64) {
 	l.lr = lr
+	l.currentLR = lr
 }
 
 func (l *LARS) GetLearningRate() float64 {
-	return l.lr
+	return l.currentLR
+}
+
+func (l *LARS) GetLR() float64 {
+	return l.currentLR
 }
 
 // ============================================================
@@ -449,13 +466,14 @@ func (l *LARS) GetLearningRate() float64 {
 
 // LAMB implements LAMB optimizer
 type LAMB struct {
-	Slots    []*ParamSlot
-	lr       float64
-	beta1    float64
-	beta2    float64
-	eps      float64
+	Slots       []*ParamSlot
+	lr          float64
+	beta1       float64
+	beta2       float64
+	eps         float64
 	weightDecay float64
-	step     int
+	step        int
+	currentLR   float64
 }
 
 func NewLAMB(lr, beta1, beta2, eps, weightDecay float64) *LAMB {
@@ -466,6 +484,7 @@ func NewLAMB(lr, beta1, beta2, eps, weightDecay float64) *LAMB {
 		beta2:       beta2,
 		eps:         eps,
 		weightDecay: weightDecay,
+		currentLR:   lr,
 	}
 }
 
@@ -550,96 +569,15 @@ func (l *LAMB) ZeroGrad() {
 
 func (l *LAMB) SetLearningRate(lr float64) {
 	l.lr = lr
+	l.currentLR = lr
 }
 
 func (l *LAMB) GetLearningRate() float64 {
-	return l.lr
+	return l.currentLR
 }
 
-// ============================================================
-// Shampoo: Preconditioned Stochastic Gradient Descent
-// ============================================================
-
-// Shampoo implements the Shampoo optimizer
-type Shampoo struct {
-	Slots       []*ParamSlot
-	lr          float64
-	beta1       float64
-	beta2       float64
-	eps         float64
-	weightDecay float64
-	step        int
-	graftBeta   float64 // Graft from SGD
-}
-
-func NewShampoo(lr, beta1, beta2, eps, weightDecay, graftBeta float64) *Shampoo {
-	return &Shampoo{
-		Slots:       make([]*ParamSlot, 0),
-		lr:          lr,
-		beta1:       beta1,
-		beta2:       beta2,
-		eps:         eps,
-		weightDecay: weightDecay,
-		graftBeta:   graftBeta,
-	}
-}
-
-func (s *Shampoo) AddParams(params [][]float64) {
-	for _, param := range params {
-		slot := &ParamSlot{
-			Data: param,
-			Grad: make([]float64, len(param)),
-			M1:   make([]float64, len(param)), // First moment
-		}
-		s.Slots = append(s.Slots, slot)
-	}
-}
-
-func (s *Shampoo) Step() {
-	s.step++
-
-	for _, slot := range s.Slots {
-		if len(slot.Grad) == 0 {
-			continue
-		}
-
-		// Compute diagonal preconditioner (simplified Shampoo)
-		// Full Shampoo uses Kronecker products per dimension
-		gradNormSq := 0.0
-		for _, g := range slot.Grad {
-			gradNormSq += g * g
-		}
-		precond := math.Sqrt(gradNormSq + s.eps)
-
-		for i := range slot.Data {
-			g := slot.Grad[i]
-
-			// Graft from SGD
-			slot.M1[i] = s.graftBeta*slot.M1[i] + g
-
-			// Shampoo update (diagonal approximation)
-			update := g / precond
-
-			// Apply update
-			slot.Data[i] -= s.lr * update
-		}
-	}
-}
-
-func (s *Shampoo) ZeroGrad() {
-	for _, slot := range s.Slots {
-		for i := range slot.Grad {
-			slot.Grad[i] = 0
-		}
-	}
-}
-
-func (s *Shampoo) SetLearningRate(lr float64) {
-	s.lr = lr
-}
-
-func (s *Shampoo) GetLearningRate() float64 {
-	return s.lr
+func (l *LAMB) GetLR() float64 {
+	return l.currentLR
 }
 
 // ============================================================
@@ -647,11 +585,7 @@ func (s *Shampoo) GetLearningRate() float64 {
 // ============================================================
 
 // CreateOptimizer creates an optimizer by name
-func CreateOptimizer(name string, lr float64, params [][]float64) interface {
-	Step()
-	ZeroGrad()
-	SetLearningRate(lr float64)
-} {
+func CreateOptimizer(name string, lr float64, params [][]float64) OptimizerWithLR {
 	switch name {
 	case "adam":
 		opt := NewAdamScale(lr, 0.9, 0.999, 1e-8, 0.0)

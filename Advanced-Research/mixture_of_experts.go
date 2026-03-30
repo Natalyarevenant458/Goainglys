@@ -1,4 +1,4 @@
-package advanced_research
+package main
 
 import (
 	"math"
@@ -175,7 +175,6 @@ func (m *MoELayer) Route(x [][]float64) [][]float64 {
 func (m *MoELayer) TopK(routingWeights [][]float64) ([][]int, [][]float64) {
 	batchSize := len(routingWeights)
 	numExperts := m.config.NumExperts
-	topK := m.config.TopK
 
 	expertIndices := make([][]int, batchSize)
 	expertWeights := make([][]float64, batchSize)
@@ -199,6 +198,7 @@ func (m *MoELayer) TopK(routingWeights [][]float64) ([][]int, [][]float64) {
 		})
 
 		// Take top-k
+		topK := m.config.TopK
 		expertIndices[i] = make([]int, topK)
 		expertWeights[i] = make([]float64, topK)
 		capacity := int(float64(len(routingWeights[i])) * m.config.Capacity / float64(numExperts))
@@ -296,7 +296,6 @@ func (m *MoELayer) Forward(x [][]float64) [][]float64 {
 func (m *MoELayer) Backward(x, gradOutput [][]float64, lr float64) {
 	batchSize := len(x)
 	numExperts := m.config.NumExperts
-	topK := m.config.TopK
 	epsilon := 1e-5
 
 	// Compute gradients via finite differences for router
@@ -335,6 +334,8 @@ func (m *MoELayer) Backward(x, gradOutput [][]float64, lr float64) {
 	for ex := 0; ex < numExperts; ex++ {
 		m.expertBackward(x[0], gradOutput[0], m.experts[ex], lr)
 	}
+
+	_ = batchSize // batchSize was used for input dimensions
 }
 
 // expertBackward performs backpropagation for a single expert

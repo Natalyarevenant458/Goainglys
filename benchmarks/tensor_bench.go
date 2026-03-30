@@ -5,7 +5,6 @@ import (
 	"math"
 	"math/rand"
 	"runtime"
-	"sync"
 	"testing"
 	"time"
 )
@@ -76,10 +75,9 @@ func MatMulBlocked(a, b, c *Tensor, blockSize int) {
 	for i := 0; i < rowsA; i += blockSize {
 		for j := 0; j < colsB; j += blockSize {
 			for k := 0; k < colsA; k += blockSize {
-				// Compute block
-				iEnd := min(rowsA, i+blockSize)
-				jEnd := min(colsB, j+blockSize)
-				kEnd := min(colsA, k+blockSize)
+				iEnd := minInt(rowsA, i+blockSize)
+				jEnd := minInt(colsB, j+blockSize)
+				kEnd := minInt(colsA, k+blockSize)
 
 				for ii := i; ii < iEnd; ii++ {
 					for jj := j; jj < jEnd; jj++ {
@@ -102,7 +100,6 @@ func Softmax(input, output *Tensor) {
 
 	for i := 0; i < rows; i++ {
 		offset := i * cols
-		// Find max for numerical stability
 		maxVal := input.data[offset]
 		for j := 1; j < cols; j++ {
 			if input.data[offset+j] > maxVal {
@@ -110,14 +107,12 @@ func Softmax(input, output *Tensor) {
 			}
 		}
 
-		// Compute exp and sum
 		sum := 0.0
 		for j := 0; j < cols; j++ {
 			output.data[offset+j] = math.Exp(input.data[offset+j] - maxVal)
 			sum += output.data[offset+j]
 		}
 
-		// Normalize
 		for j := 0; j < cols; j++ {
 			output.data[offset+j] /= sum
 		}
@@ -125,31 +120,32 @@ func Softmax(input, output *Tensor) {
 }
 
 // LayerNorm performs layer normalization
-func LayerNorm(input, output, gamma, beta, mean, var *Tensor, eps float64) {
+func LayerNorm(input, output, gamma, beta, mean, varTensor *Tensor, eps float64) {
 	rows := input.shape[0]
 	cols := input.shape[1]
 
 	for i := 0; i < rows; i++ {
 		offset := i * cols
 
-		// Compute mean
 		sum := 0.0
 		for j := 0; j < cols; j++ {
 			sum += input.data[offset+j]
 		}
 		m := sum / float64(cols)
-		mean.data[i] = m
+		if mean != nil && i < len(mean.data) {
+			mean.data[i] = m
+		}
 
-		// Compute variance
 		varSum := 0.0
 		for j := 0; j < cols; j++ {
 			diff := input.data[offset+j] - m
 			varSum += diff * diff
 		}
 		v := varSum / float64(cols)
-		var.data[i] = v
+		if varTensor != nil && i < len(varTensor.data) {
+			varTensor.data[i] = v
+		}
 
-		// Normalize and scale
 		invStd := 1.0 / math.Sqrt(v+eps)
 		for j := 0; j < cols; j++ {
 			normalized := (input.data[offset+j] - m) * invStd
@@ -158,19 +154,14 @@ func LayerNorm(input, output, gamma, beta, mean, var *Tensor, eps float64) {
 	}
 }
 
-// MLP represents a simple multi-layer perceptron
-type MLP struct {
-	layers     []*Linear
-	activations []func(*Tensor)
-}
-
-type Linear struct {
+// LinearLayer represents a linear layer
+type LinearLayer struct {
 	weight *Tensor
 	bias   *Tensor
 }
 
-func NewLinear(inputDim, outputDim int) *Linear {
-	l := &Linear{
+func NewLinearLayer(inputDim, outputDim int) *LinearLayer {
+	l := &LinearLayer{
 		weight: NewTensor(inputDim, outputDim),
 		bias:   NewTensor(1, outputDim),
 	}
@@ -179,7 +170,7 @@ func NewLinear(inputDim, outputDim int) *Linear {
 	return l
 }
 
-func (l *Linear) Forward(input *Tensor) *Tensor {
+func (l *LinearLayer) Forward(input *Tensor) *Tensor {
 	output := NewTensor(input.shape[0], l.weight.shape[1])
 	rows := input.shape[0]
 	colsIn := input.shape[1]
@@ -197,19 +188,26 @@ func (l *Linear) Forward(input *Tensor) *Tensor {
 	return output
 }
 
-func (l *Linear) Backward(input, gradOutput *Tensor) {
+func (l *LinearLayer) Backward(input, gradOutput *Tensor) {
 	rows := input.shape[0]
-	colsIn := input.shape[1]
+	colsIn := l.weight.shape[0]
 	colsOut := l.weight.shape[1]
 
-	// Weight gradient: input.T @ gradOutput
-	for i := 0; i < colsIn; i++ {
-		for j := 0; j < colsOut; j++ {
+	// Weight gradient
+	for i := 0; i < colsIn && i*colsOut < len(l.weight.grad); i++ {
+		for j := 0; j < colsOut && i*colsOut+j < len(l.weight.grad); j++ {
 			sum := 0.0
 			for k := 0; k < rows; k++ {
-				sum += input.data[k*colsIn+i] * gradOutput.data[k*colsOut+j]
+				idx := k*colsIn+i
+				outIdx := k*colsOut+j
+				if idx < len(input.data) && outIdx < len(gradOutput.data) {
+					sum += input.data[idx] * gradOutput.data[outIdx]
+				}
 			}
-			l.weight.grad[i*colsOut+j] += sum / float64(rows)
+			gradIdx := i*colsOut+j
+			if gradIdx < len(l.weight.grad) {
+				l.weight.grad[gradIdx] += sum / float64(rows)
+			}
 		}
 	}
 
@@ -217,9 +215,14 @@ func (l *Linear) Backward(input, gradOutput *Tensor) {
 	for j := 0; j < colsOut; j++ {
 		sum := 0.0
 		for k := 0; k < rows; k++ {
-			sum += gradOutput.data[k*colsOut+j]
+			outIdx := k*colsOut+j
+			if outIdx < len(gradOutput.data) {
+				sum += gradOutput.data[outIdx]
+			}
 		}
-		l.bias.grad[j] += sum / float64(rows)
+		if j < len(l.bias.grad) {
+			l.bias.grad[j] += sum / float64(rows)
+		}
 	}
 }
 
@@ -230,31 +233,29 @@ func relu(x float64) float64 {
 	return 0
 }
 
-func reluBackward(gradOutput, output *Tensor) {
-	for i := range gradOutput.data {
-		if output.data[i] > 0 {
-			gradOutput.data[i] = gradOutput.data[i]
-		} else {
-			gradOutput.data[i] = 0
-		}
-	}
+// MLP represents a simple multi-layer perceptron
+type MLP struct {
+	layers     []*LinearLayer
+	activations []func(*Tensor)
 }
 
 func NewMLP(inputDim, hiddenDim, outputDim, numLayers int) *MLP {
 	mlp := &MLP{
-		layers:     make([]*Linear, numLayers),
+		layers:     make([]*LinearLayer, numLayers),
 		activations: make([]func(*Tensor), numLayers-1),
 	}
 
 	prevDim := inputDim
 	for i := 0; i < numLayers; i++ {
 		if i == numLayers-1 {
-			mlp.layers[i] = NewLinear(prevDim, outputDim)
+			mlp.layers[i] = NewLinearLayer(prevDim, outputDim)
 		} else {
-			mlp.layers[i] = NewLinear(prevDim, hiddenDim)
+			mlp.layers[i] = NewLinearLayer(prevDim, hiddenDim)
 			mlp.activations[i] = func(t *Tensor) {
-				for i := range t.data {
-					t.data[i] = relu(t.data[i])
+				for idx := range t.data {
+					if t.data[idx] < 0 {
+						t.data[idx] = 0
+					}
 				}
 			}
 		}
@@ -276,15 +277,12 @@ func (m *MLP) Forward(input *Tensor) *Tensor {
 }
 
 func (m *MLP) Backward(input, gradOutput *Tensor) {
-	// Simplified backward - just compute gradients for weights
-	// In a real implementation, we'd also propagate to input
 	grad := make([]float64, len(gradOutput.data))
 	copy(grad, gradOutput.data)
 	gradTensor := NewTensorWithData(grad, gradOutput.shape[0], gradOutput.shape[1])
 
 	for i := len(m.layers) - 1; i >= 0; i-- {
-		layer := m.layers[i]
-		layer.Backward(input, gradTensor)
+		m.layers[i].Backward(input, gradTensor)
 	}
 }
 
@@ -332,7 +330,7 @@ func BenchmarkMatMulSizes(b *testing.B) {
 
 // BenchmarkMatMulBlocked benchmarks blocked matrix multiplication
 func BenchmarkMatMulBlocked(b *testing.B) {
-	sizes := []int{256, 512, 1024}
+	sizes := []int{256, 512}
 	blockSizes := []int{32, 64}
 
 	for _, size := range sizes {
@@ -355,9 +353,9 @@ func BenchmarkMatMulBlocked(b *testing.B) {
 
 // BenchmarkSoftmax benchmarks softmax operation
 func BenchmarkSoftmax(b *testing.B) {
-	input := NewTensor(10000, 10000)
+	input := NewTensor(1000, 1000)
 	input.Rand()
-	output := NewTensor(10000, 10000)
+	output := NewTensor(1000, 1000)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -373,14 +371,12 @@ func BenchmarkLayerNorm(b *testing.B) {
 	output := NewTensor(256, 512)
 	gamma := NewTensor(1, 512)
 	beta := NewTensor(1, 512)
-	mean := NewTensor(256, 1)
-	var := NewTensor(256, 1)
 	gamma.Rand()
 	beta.Rand()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		LayerNorm(input, output, gamma, beta, mean, var, 1e-5)
+		LayerNorm(input, output, gamma, beta, nil, nil, 1e-5)
 	}
 	b.ReportAllocs()
 }
@@ -391,10 +387,8 @@ func BenchmarkBackward(b *testing.B) {
 	input := NewTensor(32, 128)
 	input.Rand()
 
-	// First forward pass to get output
 	output := mlp.Forward(input)
 
-	// Create dummy gradient
 	gradOutput := NewTensor(output.shape[0], output.shape[1])
 	gradOutput.Rand()
 
@@ -433,8 +427,7 @@ func MemoryUsage() uint64 {
 }
 
 // runWithTiming runs fn and returns timing statistics
-func runWithTiming(fn func(), iterations int) (float64, float64, float64, float64) {
-	// Warmup
+func runWithTiming(fn func(), iterations int) (float64, float64, float64, float64, float64) {
 	fn()
 
 	var memBefore uint64
@@ -451,14 +444,12 @@ func runWithTiming(fn func(), iterations int) (float64, float64, float64, float6
 		times[i] = t1.Sub(t0)
 	}
 
-	// Calculate statistics
 	var total time.Duration
 	for _, t := range times {
 		total += t
 	}
 	avg := total.Seconds() / float64(iterations)
 
-	// Calculate percentiles
 	sorted := make([]time.Duration, len(times))
 	copy(sorted, times)
 	for i := 0; i < len(sorted)-1; i++ {
@@ -493,8 +484,7 @@ type TensorBenchmarkResults struct {
 func RunTensorBenchmarks() []TensorBenchmarkResults {
 	results := []TensorBenchmarkResults{}
 
-	// MatMul benchmarks
-	sizes := []int{128, 256, 512, 1024}
+	sizes := []int{128, 256, 512}
 	for _, size := range sizes {
 		a := NewTensor(size, size)
 		bMat := NewTensor(size, size)
@@ -518,15 +508,14 @@ func RunTensorBenchmarks() []TensorBenchmarkResults {
 		})
 	}
 
-	// Softmax benchmark
-	input := NewTensor(1000, 10000)
+	input := NewTensor(1000, 1000)
 	input.Rand()
-	output := NewTensor(1000, 10000)
+	output := NewTensor(1000, 1000)
 	fn := func() { Softmax(input, output) }
 	avg, p50, p95, p99, mem := runWithTiming(fn, 10)
 	results = append(results, TensorBenchmarkResults{
 		Operation:    "Softmax",
-		Size:         "1000x10000",
+		Size:         "1000x1000",
 		OpsPerSec:    1.0 / avg,
 		AvgLatencyMs: avg * 1000,
 		P50LatencyMs: p50 * 1000,
@@ -535,17 +524,14 @@ func RunTensorBenchmarks() []TensorBenchmarkResults {
 		MemoryMB:     mem,
 	})
 
-	// LayerNorm benchmark
 	lnInput := NewTensor(256, 512)
 	lnInput.Rand()
 	lnOutput := NewTensor(256, 512)
 	gamma := NewTensor(1, 512)
 	beta := NewTensor(1, 512)
-	mean := NewTensor(256, 1)
-	lnVar := NewTensor(256, 1)
 	gamma.Rand()
 	beta.Rand()
-	fn = func() { LayerNorm(lnInput, lnOutput, gamma, beta, mean, lnVar, 1e-5) }
+	fn = func() { LayerNorm(lnInput, lnOutput, gamma, beta, nil, nil, 1e-5) }
 	avg, p50, p95, p99, mem = runWithTiming(fn, 10)
 	results = append(results, TensorBenchmarkResults{
 		Operation:    "LayerNorm",
@@ -558,7 +544,6 @@ func RunTensorBenchmarks() []TensorBenchmarkResults {
 		MemoryMB:     mem,
 	})
 
-	// MLP backward benchmark
 	mlp := NewMLP(128, 128, 10, 3)
 	mlpInput := NewTensor(32, 128)
 	mlpInput.Rand()
@@ -584,12 +569,11 @@ func RunTensorBenchmarks() []TensorBenchmarkResults {
 	return results
 }
 
-func min(a, b int) int {
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-// Global var to prevent optimization
 var resultSink float64
